@@ -1,0 +1,15 @@
+{
+  "id": null,
+  "uid": "postgres-ha-overview",
+  "title": "PostgreSQL HA Overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {"id": 1, "type": "timeseries", "title": "Exporter availability", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "up{job=\"postgres\"}", "legendFormat": "{{instance}}", "refId": "A"}]},
+    {"id": 2, "type": "timeseries", "title": "Transactions per second", "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum by (instance) (rate(pg_stat_database_xact_commit[5m]))", "legendFormat": "{{instance}}", "refId": "A"}]},
+    {"id": 3, "type": "timeseries", "title": "Replication lag", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "pg_replication_lag", "legendFormat": "{{instance}}", "refId": "A"}]},
+    {"id": 4, "type": "timeseries", "title": "Host CPU busy", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])))", "legendFormat": "{{instance}}", "refId": "A"}]}
+  ]
+}

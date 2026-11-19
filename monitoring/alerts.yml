@@ -1,0 +1,59 @@
+groups:
+  - name: postgres-ha-availability
+    rules:
+      - alert: PostgreSQLExporterUnavailable
+        expr: up{job="postgres"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: PostgreSQL metrics target is unavailable
+      - alert: PatroniRESTUnavailable
+        expr: up{job="patroni"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: Patroni REST target is unavailable
+      - alert: EtcdEndpointUnavailable
+        expr: up{job="etcd"} == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: An etcd metrics endpoint is unavailable
+      - alert: EtcdLeaderMissing
+        expr: sum(etcd_server_has_leader) < 3
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: One or more etcd members report no leader
+      - alert: ReplicationLagAboveThreshold
+        expr: pg_replication_lag > 30
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: PostgreSQL replay lag exceeds 30 seconds
+      - alert: ReplicationWalLagBytesHigh
+        expr: pg_stat_replication_pg_wal_lsn_diff > 67108864
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Primary-side WAL replay distance exceeds 64 MiB
+      - alert: PostgreSQLConnectionSaturation
+        expr: sum(pg_stat_activity_count) / clamp_min(max(pg_settings_max_connections), 1) > 0.85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: PostgreSQL connection usage exceeds 85 percent
+      - alert: HostDiskUsageHigh
+        expr: 100 * (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host filesystem usage exceeds 85 percent

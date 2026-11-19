@@ -1,0 +1,271 @@
+name: postgres-ha-lab
+
+services:
+  etcd1:
+    image: quay.io/coreos/etcd:v3.5.17
+    container_name: etcd1
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd1
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --listen-metrics-urls=http://0.0.0.0:2381
+      - --advertise-client-urls=http://etcd1:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://etcd1:2380
+      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=postgres-ha-lab
+    volumes:
+      - etcd1_data:/etcd-data
+    networks: [ha-net]
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  etcd2:
+    image: quay.io/coreos/etcd:v3.5.17
+    container_name: etcd2
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd2
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --listen-metrics-urls=http://0.0.0.0:2381
+      - --advertise-client-urls=http://etcd2:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://etcd2:2380
+      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=postgres-ha-lab
+    volumes:
+      - etcd2_data:/etcd-data
+    networks: [ha-net]
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  etcd3:
+    image: quay.io/coreos/etcd:v3.5.17
+    container_name: etcd3
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd3
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --listen-metrics-urls=http://0.0.0.0:2381
+      - --advertise-client-urls=http://etcd3:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://etcd3:2380
+      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=postgres-ha-lab
+    volumes:
+      - etcd3_data:/etcd-data
+    networks: [ha-net]
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  pg1:
+    build: .
+    container_name: pg1
+    hostname: pg1
+    environment:
+      POSTGRES_SUPERUSER_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Set POSTGRES_SUPERUSER_PASSWORD in .env}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:?Set REPLICATION_PASSWORD in .env}
+      POSTGRES_SYNC_MODE: ${POSTGRES_SYNC_MODE:-false}
+      POSTGRES_MAX_CONNECTIONS: ${POSTGRES_MAX_CONNECTIONS:-200}
+    volumes:
+      - pg1_data:/var/lib/postgresql/data
+      - ./config/patroni/pg1.yml:/etc/patroni/patroni.yml:ro
+    depends_on:
+      etcd1: {condition: service_healthy}
+      etcd2: {condition: service_healthy}
+      etcd3: {condition: service_healthy}
+    networks: [ha-net]
+    ports: ["127.0.0.1:5433:5432", "127.0.0.1:8008:8008"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8008/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  pg2:
+    build: .
+    container_name: pg2
+    hostname: pg2
+    environment:
+      POSTGRES_SUPERUSER_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Set POSTGRES_SUPERUSER_PASSWORD in .env}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:?Set REPLICATION_PASSWORD in .env}
+      POSTGRES_SYNC_MODE: ${POSTGRES_SYNC_MODE:-false}
+      POSTGRES_MAX_CONNECTIONS: ${POSTGRES_MAX_CONNECTIONS:-200}
+    volumes:
+      - pg2_data:/var/lib/postgresql/data
+      - ./config/patroni/pg2.yml:/etc/patroni/patroni.yml:ro
+    depends_on:
+      etcd1: {condition: service_healthy}
+      etcd2: {condition: service_healthy}
+      etcd3: {condition: service_healthy}
+    networks: [ha-net]
+    ports: ["127.0.0.1:5434:5432", "127.0.0.1:8009:8008"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8008/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  pg3:
+    build: .
+    container_name: pg3
+    hostname: pg3
+    environment:
+      POSTGRES_SUPERUSER_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Set POSTGRES_SUPERUSER_PASSWORD in .env}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:?Set REPLICATION_PASSWORD in .env}
+      POSTGRES_SYNC_MODE: ${POSTGRES_SYNC_MODE:-false}
+      POSTGRES_MAX_CONNECTIONS: ${POSTGRES_MAX_CONNECTIONS:-200}
+    volumes:
+      - pg3_data:/var/lib/postgresql/data
+      - ./config/patroni/pg3.yml:/etc/patroni/patroni.yml:ro
+    depends_on:
+      etcd1: {condition: service_healthy}
+      etcd2: {condition: service_healthy}
+      etcd3: {condition: service_healthy}
+    networks: [ha-net]
+    ports: ["127.0.0.1:5435:5432", "127.0.0.1:8010:8008"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8008/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  haproxy:
+    image: haproxy:3.0.6-alpine
+    container_name: haproxy
+    depends_on: [pg1, pg2, pg3]
+    volumes:
+      - ./config/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:8404:8404"
+    networks: [ha-net]
+    restart: unless-stopped
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.23.1-p0
+    container_name: pgbouncer
+    environment:
+      DB_HOST: haproxy
+      DB_PORT: 5000
+      DB_USER: appuser
+      DB_PASSWORD: ${APP_PASSWORD:?Set APP_PASSWORD in .env}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 500
+      DEFAULT_POOL_SIZE: 40
+      RESERVE_POOL_SIZE: 10
+      AUTH_TYPE: scram-sha-256
+      LISTEN_PORT: 6432
+    depends_on: [haproxy]
+    ports: ["127.0.0.1:6432:6432"]
+    networks: [ha-net]
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=\"$$DB_PASSWORD\" psql -h 127.0.0.1 -p 6432 -U appuser -d postgres -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    ports: ["127.0.0.1:9090:9090"]
+    networks: [ha-net]
+    restart: unless-stopped
+
+  postgres-exporter-pg1:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    environment:
+      DATA_SOURCE_URI: pg1:5432/postgres?sslmode=disable
+      DATA_SOURCE_USER: appuser
+      DATA_SOURCE_PASS: ${APP_PASSWORD:?Set APP_PASSWORD in .env}
+    depends_on: [pg1]
+    networks: [ha-net]
+    restart: unless-stopped
+
+  postgres-exporter-pg2:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    environment:
+      DATA_SOURCE_URI: pg2:5432/postgres?sslmode=disable
+      DATA_SOURCE_USER: appuser
+      DATA_SOURCE_PASS: ${APP_PASSWORD:?Set APP_PASSWORD in .env}
+    depends_on: [pg2]
+    networks: [ha-net]
+    restart: unless-stopped
+
+  postgres-exporter-pg3:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    environment:
+      DATA_SOURCE_URI: pg3:5432/postgres?sslmode=disable
+      DATA_SOURCE_USER: appuser
+      DATA_SOURCE_PASS: ${APP_PASSWORD:?Set APP_PASSWORD in .env}
+    depends_on: [pg3]
+    networks: [ha-net]
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node-exporter
+    command: ["--path.rootfs=/host", "--path.procfs=/host/proc", "--path.sysfs=/host/sys"]
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    networks: [ha-net]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["127.0.0.1:3000:3000"]
+    networks: [ha-net]
+    restart: unless-stopped
+
+networks:
+  ha-net:
+    driver: bridge
+
+volumes:
+  etcd1_data:
+  etcd2_data:
+  etcd3_data:
+  pg1_data:
+  pg2_data:
+  pg3_data:
+  prometheus_data:
+  grafana_data:
