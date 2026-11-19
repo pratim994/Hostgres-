@@ -1,4 +1,7 @@
-data/
-pgdata/
-*.log
 .env
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+experiments/results/
+docs/
